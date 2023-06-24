@@ -20,6 +20,10 @@ class Content:
     data: str
 
 
+for element in lista:
+    print(element)
+
+
 FnNotify: TypeAlias = Callable[[list[Content]], None]
 
 
