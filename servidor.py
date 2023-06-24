@@ -1,4 +1,8 @@
+from __future__ import annotations
 import rpyc
+import rpyc  # type: ignore
+from dataclasses import dataclass
+from typing import Callable, TypeAlias
 import threading
 from rpyc.utils.server import ThreadedServer
 import json
@@ -32,6 +36,77 @@ def inicializa_dicionario():
                 infile.seek(0)
                 dicionario = json.load(infile)
             return dicionario
+
+
+UserId: TypeAlias = str
+
+Topic: TypeAlias = str
+
+# Isso é para ser tipo uma struct
+# Frozen diz que os campos são read-only
+
+
+@dataclass(frozen=True, kw_only=True, slots=True)
+class Content:
+    author: UserId
+    topic: Topic
+    data: str
+
+
+FnNotify: TypeAlias = Callable[[list[Content]], None]
+
+
+class BrokerService(rpyc.Service):  # type: ignore
+
+    usuarios = {}
+    topicos = {}
+
+    # Implementação de exclusão mútua para impedir a condição de corrida na alteração de
+    user_lock = threading.Lock()
+    topic_lock = threading.Lock()
+
+    # Não é exposed porque só o "admin" tem acesso
+    def create_topic(self, id: UserId, topicname: str) -> Topic:
+        BrokerService.topicos[topicname] = set()
+        return topicname
+
+    # Handshake
+
+    def exposed_login(self, id: UserId, callback: FnNotify) -> bool:
+        with BrokerService.user_lock:
+            BrokerService.usuarios[id] = [callback]
+        return True
+
+    # Query operations
+
+    def exposed_list_topics(self) -> list[Topic]:
+        return list(BrokerService.topicos.keys)
+
+    # Publisher operations
+
+    def exposed_publish(self, id: UserId, topic: Topic, data: str) -> bool:
+        """
+        Função responde se Anúncio conseguiu ser publicado
+        """
+        assert False, "TO BE IMPLEMENTED"
+
+    # Subscriber operations
+
+    def exposed_subscribe_to(self, id: UserId, topic: Topic) -> bool:
+        try:
+            with BrokerService.topic_lock:
+                BrokerService.topicos[topic].add(id)
+            return True
+        except:
+            return False
+
+    def exposed_unsubscribe_to(self, id: UserId, topic: Topic) -> bool:
+        try:
+            with BrokerService.topic_lock:
+                BrokerService.topicos[topic].remove(id)
+            return True
+        except:
+            return False
 
 
 class DicionarioRemoto(rpyc.Service):
@@ -107,9 +182,6 @@ class DicionarioRemoto(rpyc.Service):
 
 
 if __name__ == "__main__":
-    # Antes de iniciar o servidor, inicializamos o dicionário(se existe, carregamos na memória, senão, criamos e carregamos na memória)
-    DicionarioRemoto.dicionario = inicializa_dicionario()
-
     # Iniciando o servidor
-    t = ThreadedServer(DicionarioRemoto, port=PORTA)
+    t = ThreadedServer(BrokerService, port=PORTA)
     t.start()
