@@ -11,8 +11,8 @@ clear = ""
 userID = None
 
 # como é um sistema simples, irei utilizar números para definir a ação
-# -1 é deslogado, 0 é tela inicial, 1 é registro, 2 é consultar, 3 é remover e 4 é finalizar o sistema
-modo = -1
+# 0 é tela inicial, 1 é registro, 2 é consultar, 3 é remover e 4 é finalizar o sistema
+modo = 0
 
 UserId: TypeAlias = str
 
@@ -75,23 +75,6 @@ def notify_callback(content_list: list[Content]) -> None:
 
     received_contents.extend(content_list)
 
-    if(modo == -1):
-        if(len(content_list) > 0):
-            print(
-                "Alguns tópicos que você segue foram atualizados enquanto você esteve fora.")
-            while(True):
-                visualizar = input(
-                    "Deseja visualizar os anúncios agora? (S/N)")
-                if(visualizar == 'N'):
-                    break
-                elif (visualizar == 'S'):
-                    print("Received content:")
-                    showContent()
-                    break
-                else:
-                    print("Comando inexistente.")
-        modo = 0
-
 
 def showContent():
     global modo
@@ -117,7 +100,20 @@ def login(conn):
 
     if(conn.root.login(userID, notify_callback)):
         print("Usuário logado")
-        modo = 0
+        if(len(received_contents) > 0):
+            print(
+                "Alguns tópicos que você segue foram atualizados enquanto você esteve fora.")
+            while(True):
+                visualizar = input(
+                    "Deseja visualizar os anúncios agora? (S/N)")
+                if(visualizar == 'N'):
+                    break
+                elif (visualizar == 'S'):
+                    print("Received content:")
+                    showContent()
+                    break
+                else:
+                    print("Comando inexistente.")
 
     else:
         print("Login não foi possível, talvez já exista alguem logado com esse usuário")
