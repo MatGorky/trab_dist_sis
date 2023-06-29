@@ -6,12 +6,13 @@ import rpyc
 HOST = 'localhost'  # maquina onde esta o servidor
 PORT = 10002    # porta que o servidor esta escutando
 
+received_contents = []
 clear = ""
 userID = None
 
 # como é um sistema simples, irei utilizar números para definir a ação
-# 0 é tela inicial, 1 é registro, 2 é consultar, 3 é remover e 4 é finalizar o sistema
-modo = 0
+# -1 é deslogado, 0 é tela inicial, 1 é registro, 2 é consultar, 3 é remover e 4 é finalizar o sistema
+modo = -1
 
 UserId: TypeAlias = str
 
@@ -48,7 +49,8 @@ def print_interface():
     print("2 - Inscrever-se em um tópico")
     print("3 - Publicar")
     print("4 - Desinscrever-se de um tópico")
-    print("5 - Sair")
+    print("5 - Visualizar anúncios (" + str(len(received_contents)) + ")")
+    print("6 - Sair")
 
     entrada = input("\nDigite o número da sua escolha: ")
 
@@ -56,7 +58,7 @@ def print_interface():
     while True:
         try:  # usando try except porque se a entrada não for um número, o cast para inteiro ira causar uma exception
             entrada = int(entrada.strip())
-            if entrada <= 5 and entrada >= 1:
+            if entrada <= 6 and entrada >= 1:
                 modo = entrada
                 break
             else:
@@ -68,24 +70,55 @@ def print_interface():
 
 
 def notify_callback(content_list: list[Content]) -> None:
-    print("Received content:")
-    for element in content_list:
-        print(element)
+    global received_contents
+    global modo
 
+    received_contents.extend(content_list)
+
+    if(modo == -1):
+        if(len(content_list) > 0):
+            print(
+                "Alguns tópicos que você segue foram atualizados enquanto você esteve fora.")
+            while(True):
+                visualizar = input(
+                    "Deseja visualizar os anúncios agora? (S/N)")
+                if(visualizar == 'N'):
+                    break
+                elif (visualizar == 'S'):
+                    print("Received content:")
+                    showContent()
+                    break
+                else:
+                    print("Comando inexistente.")
+        modo = 0
+
+
+def showContent():
+    global modo
+    global received_contents
+
+    for element in received_contents:
         print("Author:", getattr(element, "author"))
         print("Data:", getattr(element, "data"))
         print("Topic:", getattr(element, "topic"))
-
         print("--------------------------")
         input("\n\nAperte Enter para prosseguir...")
+
+    received_contents = []
+    modo = 0
 
 
 def login(conn):
     global userID
+    global modo
+
     while(not userID):
         userID = input("Digite seu nome:\n")
+
     if(conn.root.login(userID, notify_callback)):
         print("Usuário logado")
+        modo = 0
+
     else:
         print("Login não foi possível, talvez já exista alguem logado com esse usuário")
         input("\n\nAperte Enter para tentar novamente...")
@@ -143,7 +176,7 @@ def list_topics(conn):
 
 def confirm_exit():
     global modo
-    print("Gostaria mesmo de sair da aplicação?")
+    print("Gostaria mesmo de sair da aplicação? Os anúncios não visualizados serão perdidos.")
 
     while True:
         confirm_exit = input("1 - Sim\n2 - Não, voltar para o menu inicial\n")
@@ -167,7 +200,7 @@ def main():
     print("Neste sistema, você pode registrar seu interesse em quantos tópicos quiser e receber seus anúncios.\n")
     login(conn)
 
-    while modo != 4:
+    while modo != 7:
         if modo == 0:
             print_interface()
         if modo == 1:
@@ -179,6 +212,8 @@ def main():
         if modo == 4:
             unsubscribe(conn)
         if modo == 5:
+            showContent()
+        if modo == 6:
             if confirm_exit():
                 break
 
