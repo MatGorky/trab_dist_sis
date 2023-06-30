@@ -1,6 +1,6 @@
 import os
 import platform
-from typing import Callable, TypeAlias
+from typing import Callable
 import rpyc
 
 HOST = 'localhost'  # maquina onde esta o servidor
@@ -14,14 +14,10 @@ userID = None
 # 0 é tela inicial, 1 é registro, 2 é consultar, 3 é remover e 4 é finalizar o sistema
 modo = 0
 
-UserId: TypeAlias = str
-
-Topic: TypeAlias = str
-
 
 class Content:
-    author: UserId
-    topic: Topic
+    author: str
+    topic: str
     data: str
 
 
@@ -81,9 +77,9 @@ def showContent():
     global received_contents
 
     for element in received_contents:
-        print("Author:", getattr(element, "author"))
-        print("Data:", getattr(element, "data"))
-        print("Topic:", getattr(element, "topic"))
+        print("Autor:", element.author)
+        print("Tópico:", element.topic)
+        print("Conteúdo:", element.data)
         print("--------------------------")
         input("\n\nAperte Enter para prosseguir...")
 

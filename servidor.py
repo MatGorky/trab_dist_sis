@@ -7,28 +7,16 @@ from threading import Thread
 from rpyc.utils.server import ThreadedServer
 import json
 import time
+from interface import *
 
 PORTA = 10002
 
-UserId: TypeAlias = str
-
-Topic: TypeAlias = str
 
 # Isso é para ser tipo uma struct
 # Frozen diz que os campos são read-only
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
-class Content:
-    author: str
-    topic: str
-    data: str
-
-
-FnNotify: TypeAlias = Callable[[list[Content]], None]
-
-
-class BrokerService(rpyc.Service):  # type: ignore
+class CBrokerService(BrokerService):  # type: ignore
 
     usuarios = {}
     topicos = {}
@@ -44,18 +32,18 @@ class BrokerService(rpyc.Service):  # type: ignore
     # Não é exposed porque só o "admin" tem acesso
 
     def create_topic(topicname: str) -> Topic:
-        BrokerService.topicos[topicname] = set()
+        CBrokerService.topicos[topicname] = set()
         return topicname
 
     # Handshake
 
     def exposed_login(self, id: UserId, callback: FnNotify) -> bool:
-        with BrokerService.user_lock:
-            BrokerService.usuarios[id] = callback
-            if id in BrokerService.usuarios_off:
-                contents = BrokerService.usuarios_off[id]
-                BrokerService.usuarios[id](contents)
-                del BrokerService.usuarios_off[id]
+        with CBrokerService.user_lock:
+            CBrokerService.usuarios[id] = callback
+            if id in CBrokerService.usuarios_off:
+                contents = CBrokerService.usuarios_off[id]
+                CBrokerService.usuarios[id](contents)
+                del CBrokerService.usuarios_off[id]
 
         self.user_id = id
         return True
@@ -63,7 +51,7 @@ class BrokerService(rpyc.Service):  # type: ignore
     # Query operations
 
     def exposed_list_topics(self) -> list[Topic]:
-        return list(BrokerService.topicos.keys())
+        return list(CBrokerService.topicos.keys())
 
     # Publisher operations
 
@@ -75,14 +63,14 @@ class BrokerService(rpyc.Service):  # type: ignore
         if(id != self.user_id):  # Autenticação muito boa
             return False
         try:
-            usuarios = BrokerService.topicos[topic]
+            usuarios = CBrokerService.topicos[topic]
             content = Content(author=id, topic=topic, data=data)
             for element in usuarios:
-                with BrokerService.user_lock:
-                    if(element in BrokerService.usuarios_off):
-                        BrokerService.usuarios_off[element].append(content)
+                with CBrokerService.user_lock:
+                    if(element in CBrokerService.usuarios_off):
+                        CBrokerService.usuarios_off[element].append(content)
                     else:
-                        BrokerService.usuarios[element]([content])
+                        CBrokerService.usuarios[element]([content])
             return True
         except Exception as e:
             print(e)
@@ -94,8 +82,8 @@ class BrokerService(rpyc.Service):  # type: ignore
             return False
 
         try:
-            with BrokerService.topic_lock:
-                BrokerService.topicos[topic].add(id)
+            with CBrokerService.topic_lock:
+                CBrokerService.topicos[topic].add(id)
             return True
         except Exception as e:
             print(e)
@@ -105,8 +93,8 @@ class BrokerService(rpyc.Service):  # type: ignore
         if(id != self.user_id):  # Autenticação muito boa
             return False
         try:
-            with BrokerService.topic_lock:
-                BrokerService.topicos[topic].remove(id)
+            with CBrokerService.topic_lock:
+                CBrokerService.topicos[topic].remove(id)
             return True
         except Exception as e:
             print(e)
@@ -114,24 +102,24 @@ class BrokerService(rpyc.Service):  # type: ignore
 
     def on_disconnect(self, conn):
         if self.user_id is not None:
-            with BrokerService.user_lock:
-                BrokerService.usuarios_off[self.user_id] = []
+            with CBrokerService.user_lock:
+                CBrokerService.usuarios_off[self.user_id] = []
 
     def input_parallel():
         while True:
             user_input = input(
                 "Escreva o nome do topico que deseja adicionar: ")
-            if(user_input in BrokerService.topicos) or user_input == "":
+            if(user_input in CBrokerService.topicos) or user_input == "":
                 print("ja existe um topico com esse nome")
             else:
-                BrokerService.create_topic(user_input)
+                CBrokerService.create_topic(user_input)
 
 
 if __name__ == "__main__":
     # Iniciando o servidor
-    t = ThreadedServer(BrokerService, port=PORTA,
+    t = ThreadedServer(CBrokerService, port=PORTA,
                        protocol_config={'allow_getattr': True, 'allow_public_attrs': True})
-    input_thread = Thread(target=BrokerService.input_parallel)
+    input_thread = Thread(target=CBrokerService.input_parallel)
     # Set the input thread as a daemon to exit with the main thread
     input_thread.daemon = True
     input_thread.start()
